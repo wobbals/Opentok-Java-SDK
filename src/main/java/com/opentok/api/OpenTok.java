@@ -27,32 +27,69 @@ import com.opentok.util.Base64;
 import com.opentok.util.GenerateMac;
 import com.opentok.util.TokBoxXML;
 
-public class OpenTokSDK {
+public class OpenTok {
+    
+    public class Session {
+        private String sessionId;
+        private String token;
+        
+        protected Session(String session_id) {
+            this.sessionId = session_id;
+        }
+        
+        protected void setToken(String token) {
+            this.token = token;
+        }
 
-	protected int api_key;
-	protected String api_secret;
+        public String getSessionId() {
+            return this.sessionId;
+        }
+        
+        public String getToken() {
+            return this.token;
+        }
+        
+        public String getApiKey() {
+            return OpenTok.this.apiKey;
+        }
+        
+        public String generateToken() throws OpenTokException {
+            this.token = OpenTok.this.generateToken(getSessionId());
+            return this.token;
+        }
+    }
+    
+	protected String apiKey;
+	protected String apiSecret;
 
-	public OpenTokSDK(int api_key, String api_secret) {
-		this.api_key = api_key;
-		this.api_secret = api_secret.trim();
+	public OpenTok(String apiKey, String apiSecret) {
+		this.apiKey = apiKey;
+		this.apiSecret = apiSecret.trim();
 	}
 
 	/**
+     * Generate a token which is passed to client libraries to enable 
+     * authentication with the OpenTok API.
 	 *
-     * Generate a token which is passed to the JS API to enable widgets to connect to the Opentok api.
-	 *
-*    * @session_id: Specify a session_id to make this token only valid for that session_id. Tokens generated without a valid sessionId will be rejected and the client might be disconnected.
-     * @role: One of the constants defined in RoleConstants. Default is publisher, look in the documentation to learn more about roles.
-     * @expire_time: Integer timestamp. You can override the default token expire time of 24h by choosing an explicit expire time. Can be up to 7d after create_time.
+	 * @session_id: Specify a session_id to make this token only valid for that
+	 * session_id. Tokens generated without a valid sessionId will be rejected 
+	 * and the client might be disconnected.
+     * @role: One of the constants defined in RoleConstants. Default is 
+     * publisher, look in the documentation to learn more about roles.
+     * @expire_time: Integer timestamp. You can override the default token 
+     * expire time of 24h by choosing an explicit expire time. Can be up to 7d
+     * after create_time.
 	 */
-    public String generate_token(String session_id, String role, Long expire_time, String connection_data) throws OpenTokException {
+    public String generateToken(String sessionId, String role,
+            Long expire_time, String connection_data) throws OpenTokException
+    {
 	
-        if(session_id == null || session_id == "") {
-            throw new OpenTokException("Null or empty session ID are not valid");   
+        if(sessionId == null || sessionId == "") {
+            throw new OpenTokException("sessionId may not be null or empty");   
         }
         String decodedSessionId = "";
         try { 
-            String subSessionId = session_id.substring(2);
+            String subSessionId = sessionId.substring(2);
             for (int i = 0; i<3; i++){
                 String newSessionId = subSessionId.concat(repeatString("=",i));
                 decodedSessionId = new String(DatatypeConverter.parseBase64Binary(
@@ -61,7 +98,7 @@ public class OpenTokSDK {
                     break;
                 }
             }
-            if(!decodedSessionId.split("~")[1].equals(String.valueOf(api_key))) {
+            if(!decodedSessionId.split("~")[1].equals(String.valueOf(apiKey))) {
                 throw new OpenTokException("An invalid session ID was passed");
             }
         } catch (Exception e) {
@@ -75,7 +112,7 @@ public class OpenTokSDK {
 		Random random = new Random();
 		int nonce = random.nextInt();
 		data_string_builder.append("session_id=");
-		data_string_builder.append(session_id);
+		data_string_builder.append(sessionId);
 		data_string_builder.append("&create_time=");
 		data_string_builder.append(create_time);
 		data_string_builder.append("&nonce=");
@@ -115,12 +152,12 @@ public class OpenTokSDK {
 
 			StringBuilder inner_builder = new StringBuilder();
 			inner_builder.append("partner_id=");
-			inner_builder.append(this.api_key);
+			inner_builder.append(this.apiKey);
 
 			inner_builder.append("&sig=");
 
 			inner_builder.append(GenerateMac.calculateRFC2104HMAC(data_string_builder.toString(),
-																  this.api_secret));
+																  this.apiSecret));
 			inner_builder.append(":");
 			inner_builder.append(data_string_builder.toString());
 
@@ -137,54 +174,66 @@ public class OpenTokSDK {
 	/**
 	 * Creates a new session.
 	 * @location: IP address to geolocate the call around.
-	 * @session_properties: Optional array, keys are defined in SessionPropertyConstants
+	 * @session_properties: Optional array, keys are defined in
+	 *  SessionPropertyConstants
 	 */
-
-    public OpenTokSession create_session(String location, SessionProperties properties) throws OpenTokException {
+    public Session createSession(String location, SessionProperties properties)
+            throws OpenTokException
+    {
 		Map<String, String> params;
 		if(properties != null)
 			params = properties.to_map();
 		else
 			params = new HashMap<String, String>();
 
-		return this.create_session(location, params);
+		return this.createSession(location, params);
 	}
 
-	/**
+	/*
 	 * Overloaded functions
-	 * These work the same as those defined above, but with optional params filled in with defaults
+	 * These work the same as those defined above, but with optional params 
+	 * filled in with defaults
 	 */
 
-	public String generate_token(String session_id) throws OpenTokException {
-		return this.generate_token(session_id, RoleConstants.PUBLISHER, null, null);
+	public String generateToken(String session_id) throws OpenTokException {
+		return this.generateToken(session_id, RoleConstants.PUBLISHER, null, 
+		        null);
 	}
 
 
-	public String generate_token(String session_id, String role) throws OpenTokException {
-		return this.generate_token(session_id, role, null, null);
+	public String generateToken(String session_id, String role)
+	        throws OpenTokException
+	{
+		return this.generateToken(session_id, role, null, null);
 	}
 
-	public String generate_token(String session_id, String role, Long expire_time) throws OpenTokException {
-		return this.generate_token(session_id, role, expire_time, null);
+	public String generateToken(String session_id, String role, 
+	        Long expire_time) 
+	        throws OpenTokException
+	{
+		return this.generateToken(session_id, role, expire_time, null);
 	}
 
-    public OpenTokSession create_session() throws OpenTokException {
-		return create_session(null, new HashMap<String, String>());
+    public Session createSession() throws OpenTokException {
+		return createSession(null, new HashMap<String, String>());
 	}
 
+    public Session getSession(String sessionId) {
+        return new Session(sessionId);
+    }
 
-    public OpenTokSession create_session(String location) throws OpenTokException {
-		return create_session(location, new HashMap<String, String>());
+    public Session createSession(String location) throws OpenTokException {
+		return createSession(location, new HashMap<String, String>());
 	}
 
-    public OpenTokSession create_session(String location, Map<String, String> params) throws OpenTokException {
+    public Session createSession(String location, Map<String, String> params) throws OpenTokException {
 		params.put("location", location);
 		TokBoxXML xmlResponse = this.do_request("/session/create", params);
 		if(xmlResponse.hasElement("error", "Errors")) {
 			throw new OpenTokException("Unable to create session");
 		}
 		String session_id = xmlResponse.getElementValue("session_id", "Session");
-		return new OpenTokSession(session_id);
+		return new Session(session_id);
 	}
     
     private static String repeatString(String str, int times){
@@ -196,7 +245,7 @@ public class OpenTokSDK {
 	protected TokBoxXML do_request(String url, Map<String, String> params) throws OpenTokException {
 		TokBoxNetConnection n = new TokBoxNetConnection();
 		Map<String, String> headers = new HashMap<String, String>();
-		headers.put("X-TB-PARTNER-AUTH", this.api_key + ":" + this.api_secret);
+		headers.put("X-TB-PARTNER-AUTH", this.apiKey + ":" + this.apiSecret);
 
 		return new TokBoxXML(n.request(API_Config.API_URL + url, params, headers));
 	}
